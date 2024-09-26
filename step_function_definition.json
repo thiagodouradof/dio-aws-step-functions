@@ -1,0 +1,77 @@
+{
+    "Comment": "Fluxo de Delivery utilizando AWS Step Functions e Amazon Bedrock",
+    "StartAt": "RecepcaoPedido",
+    "States": {
+      "RecepcaoPedido": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:123456789012:function:RecepcaoPedido",
+        "Next": "ValidacaoPedido"
+      },
+      "ValidacaoPedido": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ValidacaoPedido",
+        "Catch": [
+          {
+            "ErrorEquals": ["PedidoInvalido"],
+            "Next": "FalhaValidacao"
+          }
+        ],
+        "Next": "IntegracaoPagamento"
+      },
+      "FalhaValidacao": {
+        "Type": "Fail",
+        "Error": "PedidoInvalido",
+        "Cause": "O pedido não passou na validação."
+      },
+      "IntegracaoPagamento": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:123456789012:function:IntegracaoPagamento",
+        "Catch": [
+          {
+            "ErrorEquals": ["PagamentoFalhou"],
+            "Next": "FalhaPagamento"
+          }
+        ],
+        "Next": "PersonalizacaoBedrock"
+      },
+      "FalhaPagamento": {
+        "Type": "Fail",
+        "Error": "PagamentoFalhou",
+        "Cause": "Falha ao processar o pagamento."
+      },
+      "PersonalizacaoBedrock": {
+        "Type": "Task",
+        "Resource": "arn:aws:bedrock:us-east-1:123456789012:service:PersonalizacaoAssistente",
+        "Next": "AtualizacaoStatusEntrega"
+      },
+      "AtualizacaoStatusEntrega": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:123456789012:function:AtualizacaoStatusEntrega",
+        "Next": "ConfirmacaoEntrega"
+      },
+      "ConfirmacaoEntrega": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.statusEntrega",
+            "StringEquals": "Entregue",
+            "Next": "SucessoEntrega"
+          },
+          {
+            "Variable": "$.statusEntrega",
+            "StringEquals": "NaoEntregue",
+            "Next": "FalhaEntrega"
+          }
+        ]
+      },
+      "SucessoEntrega": {
+        "Type": "Succeed"
+      },
+      "FalhaEntrega": {
+        "Type": "Fail",
+        "Error": "EntregaFalhou",
+        "Cause": "Falha na entrega do pedido."
+      }
+    }
+  }
+  
